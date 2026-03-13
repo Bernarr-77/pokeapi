@@ -44,3 +44,4 @@ def get_users_email(email):
 if __name__ == "__main__":
     start_bank_users()
     print("Banco de dados users funcionando")
+    
