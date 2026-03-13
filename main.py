@@ -42,13 +42,17 @@ def system_open(register: OAuth2PasswordRequestForm = Depends()):
     return {"access_token": token, "token_type": "bearer"}
 
 
-
 @app.post("/porta")
-def acessar_oraculo(input: Pokemon, usuario_logado: str = Depends(get_token)):
-    return {"Mensagem": f"Acesso liberado. Bem-vindo, {usuario_logado}."}
-
-
-    
-    
+async def acessar_pokeapi(input: Pokemon, usuario_logado: str = Depends(get_token)):
+    nome_pokemon = input.pokemons[0].lower()
+    url = f"https://pokeapi.co/api/v2/pokemon/{nome_pokemon}"
+    async with httpx.AsyncClient() as cliente:
+        resposta = await cliente.get(url)
+        dados_brutos = resposta.json()
+        pokemon_limpo = {
+            "name": dados_brutos["name"],
+            "icons": dados_brutos["sprites"]["front_default"]
+        }
+    return pokemon_limpo
 
 
