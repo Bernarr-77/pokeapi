@@ -5,6 +5,7 @@ import sqlite3
 from validate.schemas import UserRegister, Pokemon
 from validate.security import hash_password, verify_password,create_access_token,verify_token
 from database import insert_users, get_users_email
+import asyncio
 
 app = FastAPI()
 oauth = OAuth2PasswordBearer(tokenUrl="login")
@@ -16,6 +17,19 @@ def get_token(token: str = Depends(oauth)):
     except ValueError:
          raise HTTPException(status_code= 401, detail= "Token inválido.")
     
+async def buscar_pokemon(nome: str, cliente: httpx.AsyncClient):
+    url = f"https://pokeapi.co/api/v2/pokemon/{nome}"
+    resposta = await cliente.get(url)
+    dados_brutos = resposta.json()
+    pokemon_limpo = {
+        "name": dados_brutos["name"],
+        "image_url": dados_brutos["sprites"]["front_default"],
+        "types": [item["type"]["name"] for item in dados_brutos["types"]],
+        "ability": [item["ability"]["name"] for item in dados_brutos["abilities"]],
+        "stats": {item["stat"]["name"]: item["base_stat"] for item in dados_brutos["stats"]}
+    }
+    return pokemon_limpo
+
 @app.post("/register")
 def register_user(payload: UserRegister):
     senha_protegida = hash_password(payload.password)
@@ -44,15 +58,9 @@ def system_open(register: OAuth2PasswordRequestForm = Depends()):
 
 @app.post("/porta")
 async def acessar_pokeapi(input: Pokemon, usuario_logado: str = Depends(get_token)):
-    nome_pokemon = input.pokemons[0].lower()
-    url = f"https://pokeapi.co/api/v2/pokemon/{nome_pokemon}"
-    async with httpx.AsyncClient() as cliente:
-        resposta = await cliente.get(url)
-        dados_brutos = resposta.json()
-        pokemon_limpo = {
-            "name": dados_brutos["name"],
-            "icons": dados_brutos["sprites"]["front_default"]
-        }
-    return pokemon_limpo
-
+    async with httpx.AsyncClient() as client:
+        lista_pokemon = input.pokemons
+        organiza_pokemon = [buscar_pokemon(nome.lower(), client) for nome in lista_pokemon]
+        resultado = await asyncio.gather(*organiza_pokemon)
+        return {"time": resultado}
 
